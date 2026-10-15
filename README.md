@@ -16,7 +16,10 @@ targeting Navisworks Manage / Simulate 2027. It does not contain any of the orig
 - **Category / Property lists** are built from every property on every item in the model, or in the
   selection and everything under it when **Use Selection** is checked (for example, select a model file in the
   Selection Tree). This includes native parameters such as Revit's **System Abbreviation**.
-  The lists refresh after the model, the selection or Use Selection changes.
+  The lists load when the pane opens and reload after the model, the selection (with Use Selection) or
+  Use Selection changes. **Refresh Lists** reloads them manually, and the status line shows how many
+  categories and properties were found (or why none were).
+- **Category defaults to `Element`**, where Revit parameters such as System Abbreviation appear.
 - **Searching for a property:** leave Category blank and start typing in Property, for example `System Abb`.
   The list shows every match as `Property  [Category]`, and picking one fills in both boxes. A property name
   typed without a category is accepted if only one category has it.
@@ -32,7 +35,7 @@ The pane is also listed under **View > Windows**.
 
 ## Download and install
 
-1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.1.0.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.1.0.zip).
+1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.2.0.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.2.0.zip).
 2. Close Navisworks, extract the zip, and double-click `Install.cmd`.
 
 The installer copies the add-in to `%AppData%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle` for the

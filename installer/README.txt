@@ -12,6 +12,8 @@ Finding a parameter (e.g. System Abbreviation)
   Leave Category blank and type part of the name in Property. Matches show as
   "Property  [Category]"; pick one to fill in both. With Use Selection checked, the lists
   only show properties of the selected items (select a model file to use that whole model).
+  Category starts as "Element". If a list looks empty, click Refresh Lists and check the
+  status line under the tabs.
 
   The add-in is copied to:
     %APPDATA%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle

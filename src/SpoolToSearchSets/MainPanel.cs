@@ -18,11 +18,15 @@ namespace SpoolToSearchSets
         readonly Settings _settings = Settings.Load();
         readonly ToolTip _tips = new ToolTip();
 
-        // Category -> property names in scope; rebuilt after the model, the selection
-        // (with Use Selection) or the Use Selection option changes.
-        Dictionary<string, HashSet<string>> _index;
-        Document _indexDoc;
-        bool _indexUsesSelection;
+        const string DefaultCategory = "Element";
+
+        // Category -> property names in scope (whole model, or the selection with Use Selection).
+        // Lists are filled ahead of time, never while a box is being opened.
+        Dictionary<string, HashSet<string>> _index = new Dictionary<string, HashSet<string>>();
+        bool _stale = true;
+        readonly Document _watchedDoc;
+        readonly System.Windows.Forms.Timer _reloadTimer = new System.Windows.Forms.Timer { Interval = 500 };
+        readonly Label _status = new Label { AutoSize = true, Dock = DockStyle.Bottom, Padding = new Padding(6, 4, 6, 0) };
 
         readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill };
         readonly CheckBox _useSelection = new CheckBox { Text = "Use Selection", AutoSize = true };
@@ -62,24 +66,38 @@ namespace SpoolToSearchSets
 
             var create = new Button { Text = "Create Sets", AutoSize = true };
             create.Click += (s, e) => Run();
+            var refresh = new Button { Text = "Refresh Lists", AutoSize = true };
+            refresh.Click += (s, e) => ReloadLists();
 
             var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(6) };
-            bottom.Controls.AddRange(new Control[] { _useSelection, _deleteExisting, create });
+            bottom.Controls.AddRange(new Control[] { _useSelection, _deleteExisting, refresh, create });
             Controls.Add(_tabs);
+            Controls.Add(_status);
             Controls.Add(bottom);
 
             Wire(_category, _property);
             Wire(_folderCategory, _folderProperty);
             Wire(_setCategory, _setProperty);
             LoadSettings();
+
+            _useSelection.CheckedChanged += (s, e) => ReloadLists();
+            _reloadTimer.Tick += (s, e) => { _reloadTimer.Stop(); if (Visible) ReloadLists(); };
+            VisibleChanged += (s, e) => { if (Visible && _stale) ReloadLists(); };
+            HandleCreated += (s, e) => BeginInvoke((Action)(() => { if (Visible && _stale) ReloadLists(); }));
+            _watchedDoc = Doc;
+            if (_watchedDoc != null)
+            {
+                _watchedDoc.CurrentSelection.Changed += OnSelectionChanged;
+                _watchedDoc.Models.CollectionChanged += OnModelsChanged;
+            }
         }
 
         void LoadSettings()
         {
             var s = _settings;
-            _category.Text = s.Category; _property.Text = s.Property;
-            _folderCategory.Text = s.MultiFolderCategory; _folderProperty.Text = s.MultiFolderProperty;
-            _setCategory.Text = s.MultiSetCategory; _setProperty.Text = s.MultiSetProperty;
+            _category.Text = OrDefault(s.Category); _property.Text = s.Property;
+            _folderCategory.Text = OrDefault(s.MultiFolderCategory); _folderProperty.Text = s.MultiFolderProperty;
+            _setCategory.Text = OrDefault(s.MultiSetCategory); _setProperty.Text = s.MultiSetProperty;
             _folderName.Text = s.FolderName;
             _delimiter.Text = s.Delimiter;
             _primaryIndex.Value = Clamp(s.PrimaryIndex, _primaryIndex);
@@ -155,25 +173,76 @@ namespace SpoolToSearchSets
             s.Save();
         }
 
-        // Lists load when a box is opened or focused, so typing autocompletes. With Category
-        // blank, Property lists every property in scope as "Property  [Category]"; picking one
-        // fills in both, so a parameter can be found without knowing its category.
+        static string OrDefault(string category) => string.IsNullOrWhiteSpace(category) ? DefaultCategory : category;
+
+        // Choosing a category refreshes its Property list. With Category blank, Property lists
+        // every property in scope as "Property  [Category]"; picking one fills in both.
         void Wire(ComboBox category, ComboBox property)
         {
-            category.DropDown += (s, e) => Fill(category, Index().Keys);
-            category.Enter += (s, e) => Fill(category, Index().Keys);
-            property.DropDown += (s, e) => Fill(property, PropertyChoices(category.Text.Trim()));
-            property.Enter += (s, e) => Fill(property, PropertyChoices(category.Text.Trim()));
+            category.TextChanged += (s, e) => SetItems(property, PropertyChoices(category.Text.Trim()));
             property.SelectionChangeCommitted += (s, e) => BeginInvoke((Action)(() => ApplyPair(category, property)));
             property.Leave += (s, e) => ApplyPair(category, property);
             _tips.SetToolTip(property, "Leave Category blank to search every property, e.g. type \"System Abb\".");
         }
 
+        IEnumerable<ComboBox[]> Pairs => new[]
+        {
+            new[] { _category, _property }, new[] { _folderCategory, _folderProperty }, new[] { _setCategory, _setProperty },
+        };
+
+        void ReloadLists()
+        {
+            _reloadTimer.Stop();
+            Document doc = Doc;
+            bool useSelection = _useSelection.Checked;
+            Cursor = Cursors.WaitCursor;
+            try
+            {
+                if (doc == null || doc.IsClear)
+                    ApplyIndex(new Dictionary<string, HashSet<string>>(), "No model is open.");
+                else if (useSelection && doc.CurrentSelection.IsEmpty)
+                    ApplyIndex(new Dictionary<string, HashSet<string>>(), "Use Selection is on, but nothing is selected.");
+                else
+                {
+                    var index = SetBuilder.PropertyIndex(doc, useSelection);
+                    ApplyIndex(index, $"{index.Count} categories, {index.Values.Sum(p => p.Count)} properties from " +
+                        (useSelection ? "the selection." : "the whole model."));
+                }
+            }
+            catch (Exception ex)
+            {
+                _status.Text = "Couldn't read properties: " + ex.Message;
+            }
+            finally { Cursor = Cursors.Default; }
+        }
+
+        void ApplyIndex(Dictionary<string, HashSet<string>> index, string status)
+        {
+            _index = index;
+            _stale = false;
+            _status.Text = status;
+            foreach (ComboBox[] pair in Pairs)
+            {
+                SetItems(pair[0], _index.Keys);
+                SetItems(pair[1], PropertyChoices(pair[0].Text.Trim()));
+            }
+        }
+
+        // Reloading is deferred so a burst of selection clicks causes one scan, and only while visible.
+        void ScheduleReload()
+        {
+            _stale = true;
+            _reloadTimer.Stop();
+            _reloadTimer.Start();
+        }
+
+        void OnSelectionChanged(object sender, EventArgs e) { if (_useSelection.Checked) ScheduleReload(); }
+        void OnModelsChanged(object sender, EventArgs e) => ScheduleReload();
+
         IEnumerable<string> PropertyChoices(string category)
         {
-            var index = Index();
-            if (index.TryGetValue(category, out HashSet<string> props)) return props;
-            return index.SelectMany(c => c.Value.Select(p => p + PairOpen + c.Key + "]"));
+            if (_index.TryGetValue(category, out HashSet<string> props)) return props;
+            return _index.SelectMany(c => c.Value.Select(p => p + PairOpen + c.Key + "]"));
         }
 
         static void ApplyPair(ComboBox category, ComboBox property)
@@ -191,52 +260,26 @@ namespace SpoolToSearchSets
             ApplyPair(category, property);
             string name = property.Text.Trim();
             if (category.Text.Trim().Length > 0 || name.Length == 0) return;
-            var owners = Index().Where(c => c.Value.Contains(name)).Select(c => c.Key).Take(2).ToList();
+            var owners = _index.Where(c => c.Value.Contains(name)).Select(c => c.Key).Take(2).ToList();
             if (owners.Count == 1) category.Text = owners[0];
         }
 
-        Dictionary<string, HashSet<string>> Index()
-        {
-            Document doc = Doc;
-            if (doc == null || doc.IsClear) return new Dictionary<string, HashSet<string>>();
-            if (_index == null || doc != _indexDoc || _useSelection.Checked != _indexUsesSelection)
-            {
-                Watch(doc);
-                Cursor = Cursors.WaitCursor;
-                try { _index = SetBuilder.PropertyIndex(doc, _useSelection.Checked); }
-                finally { Cursor = Cursors.Default; }
-                _indexUsesSelection = _useSelection.Checked;
-            }
-            return _index;
-        }
-
-        void Watch(Document doc)
-        {
-            if (doc == _indexDoc) return;
-            Unwatch();
-            _indexDoc = doc;
-            doc.CurrentSelection.Changed += OnSelectionChanged;
-            doc.Models.CollectionChanged += OnModelsChanged;
-        }
-
-        void Unwatch()
-        {
-            if (_indexDoc == null) return;
-            _indexDoc.CurrentSelection.Changed -= OnSelectionChanged;
-            _indexDoc.Models.CollectionChanged -= OnModelsChanged;
-            _indexDoc = null;
-        }
-
-        void OnSelectionChanged(object sender, EventArgs e) { if (_indexUsesSelection) _index = null; }
-        void OnModelsChanged(object sender, EventArgs e) => _index = null;
-
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { Unwatch(); _tips.Dispose(); }
+            if (disposing)
+            {
+                if (_watchedDoc != null)
+                {
+                    _watchedDoc.CurrentSelection.Changed -= OnSelectionChanged;
+                    _watchedDoc.Models.CollectionChanged -= OnModelsChanged;
+                }
+                _reloadTimer.Dispose();
+                _tips.Dispose();
+            }
             base.Dispose(disposing);
         }
 
-        static void Fill(ComboBox box, IEnumerable<string> items)
+        static void SetItems(ComboBox box, IEnumerable<string> items)
         {
             string text = box.Text;
             box.BeginUpdate();
