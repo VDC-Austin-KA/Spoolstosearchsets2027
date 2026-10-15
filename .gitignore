@@ -1,0 +1,5 @@
+bin/
+obj/
+.vs/
+*.user
+bundle/SpoolToSearchSets.bundle/Contents/v24/*.dll

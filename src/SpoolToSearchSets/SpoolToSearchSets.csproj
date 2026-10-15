@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Navisworks 2024 and later load .NET Framework 4.8 add-ins. -->
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SpoolToSearchSets</AssemblyName>
+    <RootNamespace>SpoolToSearchSets</RootNamespace>
+    <Version>2.0.0</Version>
+    <!-- Override with: dotnet build -p:NavisworksDir="D:\Autodesk\Navisworks Manage 2027" -->
+    <NavisworksDir Condition="'$(NavisworksDir)' == ''">C:\Program Files\Autodesk\Navisworks Manage 2027</NavisworksDir>
+    <BundleDir>$(MSBuildThisFileDirectory)..\..\bundle\SpoolToSearchSets.bundle</BundleDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Autodesk.Navisworks.Api">
+      <HintPath>$(NavisworksDir)\Autodesk.Navisworks.Api.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Navisworks 2027 is series Nw24; PackageContents.xml points at Contents\v24. -->
+  <Target Name="CopyToBundle" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BundleDir)\Contents\v24" />
+  </Target>
+
+</Project>
