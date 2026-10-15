@@ -5,7 +5,8 @@ Install
   1. Close Navisworks.
   2. Extract this zip to any folder.
   3. Double-click Install.cmd. If Windows SmartScreen warns, choose More info > Run anyway.
-  4. Start Navisworks 2027. The button is on the "Tool add-ins 1" ribbon tab.
+  4. Start Navisworks 2027. Click "Spool To Search Sets" on the "Tool add-ins 1" ribbon tab
+     to open the dockable pane. You can keep working in the model while it is open.
 
   The add-in is copied to:
     %APPDATA%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle

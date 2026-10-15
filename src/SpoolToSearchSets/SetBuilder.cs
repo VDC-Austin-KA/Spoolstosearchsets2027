@@ -45,7 +45,7 @@ namespace SpoolToSearchSets
             var values = UniqueValues(doc, useSelection, category, property);
             int created = 0;
 
-            using (Transaction tx = doc.BeginTransaction(MainForm.Caption))
+            using (Transaction tx = doc.BeginTransaction(MainPanel.Caption))
             {
                 if (deleteExisting) RemoveRootFolder(doc, root);
 
@@ -80,7 +80,7 @@ namespace SpoolToSearchSets
             var outer = UniqueValues(doc, useSelection, folderCategory, folderProperty);
             int found = 0, created = 0;
 
-            using (Transaction tx = doc.BeginTransaction(MainForm.Caption))
+            using (Transaction tx = doc.BeginTransaction(MainPanel.Caption))
             {
                 if (deleteExisting) RemoveRootFolder(doc, root);
 

@@ -2,15 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using Autodesk.Navisworks.Api;
+using NwApp = Autodesk.Navisworks.Api.Application;
 
 namespace SpoolToSearchSets
 {
-    internal sealed class MainForm : Form
+    /// <summary>Content of the dockable pane. It's modeless, so the model stays usable
+    /// (e.g. to change the selection) while it's open.</summary>
+    internal sealed class MainPanel : UserControl
     {
         public const string Caption = "Spool To Search Sets";
         const string More = "More…";
 
-        readonly Document _doc;
         readonly Settings _settings = Settings.Load();
         bool _filling;
 
@@ -28,14 +30,11 @@ namespace SpoolToSearchSets
         readonly ComboBox _setCategory = NewCombo(), _setProperty = NewCombo();
         readonly TextBox _multiFolderName = NewText();
 
-        public MainForm(Document doc)
+        // Always the current document: the pane outlives any one opened file.
+        static Document Doc => NwApp.ActiveDocument;
+
+        public MainPanel()
         {
-            _doc = doc;
-            Text = Caption;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = MinimizeBox = false;
-            StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new System.Drawing.Size(420, 330);
 
             var single = NewTable();
             AddRow(single, "Category", _category);
@@ -54,14 +53,11 @@ namespace SpoolToSearchSets
             AddRow(multi, "Folder Name", _multiFolderName);
             AddTab("Multi-Conditions", multi);
 
-            var ok = new Button { Text = "OK", AutoSize = true };
-            var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
-            ok.Click += (s, e) => Run();
-            AcceptButton = ok;
-            CancelButton = cancel;
+            var create = new Button { Text = "Create Sets", AutoSize = true };
+            create.Click += (s, e) => Run();
 
             var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(6) };
-            bottom.Controls.AddRange(new Control[] { _useSelection, _deleteExisting, ok, cancel });
+            bottom.Controls.AddRange(new Control[] { _useSelection, _deleteExisting, create });
             Controls.Add(_tabs);
             Controls.Add(bottom);
 
@@ -89,6 +85,13 @@ namespace SpoolToSearchSets
 
         void Run()
         {
+            Document doc = Doc;
+            if (doc == null || doc.IsClear)
+            {
+                MessageBox.Show(this, "Open a model first.", Caption);
+                return;
+            }
+
             bool multi = _tabs.SelectedIndex == 1;
             string[] required = multi
                 ? new[] { Value(_folderCategory), Value(_folderProperty), Value(_setCategory), Value(_setProperty) }
@@ -98,7 +101,7 @@ namespace SpoolToSearchSets
                 MessageBox.Show(this, "Category and Property are required.", Caption);
                 return;
             }
-            if (_useSelection.Checked && _doc.CurrentSelection.IsEmpty)
+            if (_useSelection.Checked && doc.CurrentSelection.IsEmpty)
             {
                 MessageBox.Show(this, "\"Use Selection\" is checked but nothing is selected.", Caption);
                 return;
@@ -110,10 +113,10 @@ namespace SpoolToSearchSets
             try
             {
                 result = multi
-                    ? SetBuilder.CreateMulti(_doc, _useSelection.Checked,
+                    ? SetBuilder.CreateMulti(doc, _useSelection.Checked,
                         Value(_folderCategory), Value(_folderProperty), Value(_setCategory), Value(_setProperty),
                         _multiFolderName.Text, _deleteExisting.Checked)
-                    : SetBuilder.CreateSingle(_doc, _useSelection.Checked,
+                    : SetBuilder.CreateSingle(doc, _useSelection.Checked,
                         Value(_category), Value(_property), _folderName.Text, _deleteExisting.Checked,
                         _delimiter.Text, (int)_primaryIndex.Value, (int)_secondaryIndex.Value);
             }
@@ -125,7 +128,6 @@ namespace SpoolToSearchSets
             finally { Cursor = Cursors.Default; }
 
             MessageBox.Show(this, $"{result.found} unique value(s) found.\n{result.created} new Search Set(s) created.", Caption);
-            DialogResult = DialogResult.OK;
         }
 
         void SaveSettings()
@@ -148,15 +150,15 @@ namespace SpoolToSearchSets
         {
             category.SelectedIndexChanged += (s, e) =>
             {
-                if (_filling || category.SelectedItem == null) return;
+                if (_filling || category.SelectedItem == null || Doc == null || Doc.IsClear) return;
                 if ((string)category.SelectedItem == More)
                 {
-                    Fill(category, SetBuilder.CategoryNames(_doc, _useSelection.Checked), "", true);
+                    Fill(category, SetBuilder.CategoryNames(Doc, _useSelection.Checked), "", true);
                     category.DroppedDown = true;
                 }
                 else
                 {
-                    Fill(property, SetBuilder.PropertyNames(_doc, _useSelection.Checked, (string)category.SelectedItem),
+                    Fill(property, SetBuilder.PropertyNames(Doc, _useSelection.Checked, (string)category.SelectedItem),
                         property.Text, false);
                 }
             };

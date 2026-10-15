@@ -19,11 +19,14 @@ targeting Navisworks Manage / Simulate 2027. It does not contain any of the orig
   **Delete Existing** rebuilds the parent folder, which removes stale sets.
 - The last-used settings are saved to `%AppData%\SpoolToSearchSets\settings.xml`.
 
-The button appears on the **Tool add-ins 1** ribbon tab.
+The **Spool To Search Sets** button on the **Tool add-ins 1** ribbon tab shows or hides a dockable pane.
+The pane is modeless, so you can keep working in the model (for example, changing the selection for
+**Use Selection**) while it's open. Click **Create Sets** to run; the pane stays open for the next run.
+The pane is also listed under **View > Windows**.
 
 ## Download and install
 
-1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.0.0.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.0.0.zip).
+1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.0.1.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.0.1.zip).
 2. Close Navisworks, extract the zip, and double-click `Install.cmd`.
 
 The installer copies the add-in to `%AppData%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle` for the
@@ -45,6 +48,9 @@ This builds `SpoolToSearchSets.dll`, copies it into `bundle/SpoolToSearchSets.bu
 packs the bundle and the `installer/` scripts into `dist/SpoolToSearchSets-Navisworks2027-v<version>.zip`.
 
 ## Notes
+
+- `PackageContents.xml` must give the `ComponentEntry` the attribute `AppType="ManagedPlugin"`, or Navisworks
+  silently ignores the DLL and no ribbon button appears.
 
 - Navisworks 2027 is release series `Nw24`. The .NET API only works within one major version, so this
   build loads only in 2027. To support another year, add a `Contents\vNN` folder and a
