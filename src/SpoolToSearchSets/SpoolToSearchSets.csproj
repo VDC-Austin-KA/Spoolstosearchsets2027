@@ -9,21 +9,36 @@
     <AssemblyName>SpoolToSearchSets</AssemblyName>
     <RootNamespace>SpoolToSearchSets</RootNamespace>
     <Version>2.0.0</Version>
-    <!-- Override with: dotnet build -p:NavisworksDir="D:\Autodesk\Navisworks Manage 2027" -->
-    <NavisworksDir Condition="'$(NavisworksDir)' == ''">C:\Program Files\Autodesk\Navisworks Manage 2027</NavisworksDir>
     <BundleDir>$(MSBuildThisFileDirectory)..\..\bundle\SpoolToSearchSets.bundle</BundleDir>
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Autodesk.Navisworks.Api">
-      <HintPath>$(NavisworksDir)\Autodesk.Navisworks.Api.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <!-- Navisworks 2027 API reference assemblies (compile-time only; Navisworks supplies them at runtime),
+         so the add-in builds on any machine, including CI, without Navisworks installed. -->
+    <PackageReference Include="Speckle.Navisworks.API" Version="2027.0.0" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Navisworks 2027 is series Nw24; PackageContents.xml points at Contents\v24. -->
   <Target Name="CopyToBundle" AfterTargets="Build">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BundleDir)\Contents\v24" />
+  </Target>
+
+  <!-- Release builds also produce the downloadable installer zip in dist\. -->
+  <Target Name="PackageZip" AfterTargets="CopyToBundle" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <DistDir>$(MSBuildThisFileDirectory)..\..\dist</DistDir>
+      <StagingDir>$(DistDir)\staging</StagingDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <BundleFiles Include="$(BundleDir)\**\*" Exclude="$(BundleDir)\**\.gitkeep" />
+      <InstallerFiles Include="$(MSBuildThisFileDirectory)..\..\installer\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(StagingDir)" />
+    <Copy SourceFiles="@(BundleFiles)" DestinationFolder="$(StagingDir)\SpoolToSearchSets.bundle\%(RecursiveDir)" />
+    <Copy SourceFiles="@(InstallerFiles)" DestinationFolder="$(StagingDir)" />
+    <ZipDirectory SourceDirectory="$(StagingDir)" DestinationFile="$(DistDir)\SpoolToSearchSets-Navisworks2027-v$(Version).zip" Overwrite="true" />
+    <RemoveDir Directories="$(StagingDir)" />
   </Target>
 
 </Project>

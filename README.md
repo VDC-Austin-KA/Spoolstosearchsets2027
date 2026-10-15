@@ -21,25 +21,28 @@ targeting Navisworks Manage / Simulate 2027. It does not contain any of the orig
 
 The button appears on the **Tool add-ins 1** ribbon tab.
 
+## Download and install
+
+1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.0.0.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.0.0.zip).
+2. Close Navisworks, extract the zip, and double-click `Install.cmd`.
+
+The installer copies the add-in to `%AppData%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle` for the
+current user (no admin rights needed) and unblocks the downloaded DLL. `Uninstall.cmd` removes it.
+
+Uninstall the original App Store version first so that two "Spool To Search Sets" buttons don't appear.
+
 ## Build
 
-Requirements: Windows, Navisworks Manage (or Simulate) 2027, and Visual Studio 2022 or the .NET SDK
-with the .NET Framework 4.8 targeting pack.
+Requirements: the .NET SDK (6 or later) on Windows, macOS or Linux. Navisworks doesn't have to be installed:
+the Navisworks 2027 API reference assemblies come from the `Speckle.Navisworks.API` NuGet package and
+are used at compile time only.
 
 ```
 dotnet build src/SpoolToSearchSets/SpoolToSearchSets.csproj -c Release
 ```
 
-If Navisworks isn't installed in the default location, add
-`-p:NavisworksDir="<install folder>"`. The build copies `SpoolToSearchSets.dll` into
-`bundle/SpoolToSearchSets.bundle/Contents/v24/`.
-
-## Install
-
-Copy the `bundle/SpoolToSearchSets.bundle` folder to `%AppData%\Autodesk\ApplicationPlugins\`
-(for the current user) or `C:\ProgramData\Autodesk\ApplicationPlugins\` (for all users), then restart Navisworks.
-
-Uninstall the original App Store version first so that two "Spool To Search Sets" buttons don't appear.
+This builds `SpoolToSearchSets.dll`, copies it into `bundle/SpoolToSearchSets.bundle/Contents/v24/`, and
+packs the bundle and the `installer/` scripts into `dist/SpoolToSearchSets-Navisworks2027-v<version>.zip`.
 
 ## Notes
 
