@@ -10,23 +10,22 @@ namespace SpoolToSearchSets
     {
         // ---- Dialog population ------------------------------------------------
 
-        public static List<string> CategoryNames(Document doc, bool useSelection) =>
-            Scope(doc, useSelection)
-                .SelectMany(i => i.PropertyCategories)
-                .Select(c => c.DisplayName)
-                .Distinct()
-                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-        public static List<string> PropertyNames(Document doc, bool useSelection, string category) =>
-            Scope(doc, useSelection)
-                .Select(i => i.PropertyCategories.FindCategoryByDisplayName(category))
-                .Where(c => c != null)
-                .SelectMany(c => c.Properties)
-                .Select(p => p.DisplayName)
-                .Distinct()
-                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+        /// <summary>Every category and the properties found under it, for all items in scope
+        /// (the whole model, or the selected items and everything below them).</summary>
+        public static Dictionary<string, HashSet<string>> PropertyIndex(Document doc, bool useSelection)
+        {
+            var index = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (ModelItem item in Scope(doc, useSelection))
+                foreach (PropertyCategory category in item.PropertyCategories)
+                {
+                    if (string.IsNullOrEmpty(category.DisplayName)) continue;
+                    if (!index.TryGetValue(category.DisplayName, out HashSet<string> props))
+                        index.Add(category.DisplayName, props = new HashSet<string>(StringComparer.Ordinal));
+                    foreach (DataProperty p in category.Properties)
+                        if (!string.IsNullOrEmpty(p.DisplayName)) props.Add(p.DisplayName);
+                }
+            return index;
+        }
 
         static IEnumerable<ModelItem> Scope(Document doc, bool useSelection) =>
             useSelection

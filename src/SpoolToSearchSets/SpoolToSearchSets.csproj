@@ -8,7 +8,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>SpoolToSearchSets</AssemblyName>
     <RootNamespace>SpoolToSearchSets</RootNamespace>
-    <Version>2.0.1</Version>
+    <Version>2.1.0</Version>
     <BundleDir>$(MSBuildThisFileDirectory)..\..\bundle\SpoolToSearchSets.bundle</BundleDir>
   </PropertyGroup>
 

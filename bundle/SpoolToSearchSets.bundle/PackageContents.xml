@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ApplicationPackage SchemaVersion="1.0" AutodeskProduct="Navisworks" ProductType="Application"
-    Name="Spool To Search Sets" AppVersion="2.0.1"
+    Name="Spool To Search Sets" AppVersion="2.1.0"
     Description="Creates and maintains Search Sets for unique property values."
     ProductCode="{D969AF43-38EC-41EC-8F93-C4C7E2B43153}"
     UpgradeCode="{2F140594-0C87-4B09-BF09-295B160ADF30}">
   <Components Description="Navisworks 2027">
     <RuntimeRequirements OS="Win64" Platform="NAVMAN|NAVSIM" SeriesMin="Nw24" SeriesMax="Nw24" />
     <!-- AppType="ManagedPlugin" is required, or Navisworks skips the DLL. -->
-    <ComponentEntry AppName="SpoolToSearchSets" AppType="ManagedPlugin" Version="2.0.1"
+    <ComponentEntry AppName="SpoolToSearchSets" AppType="ManagedPlugin" Version="2.1.0"
         ModuleName="./Contents/v24/SpoolToSearchSets.dll"
         AppDescription="Spool To Search Sets for Navisworks 2027" />
   </Components>

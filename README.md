@@ -13,7 +13,13 @@ targeting Navisworks Manage / Simulate 2027. It does not contain any of the orig
     secondary index 3, the set goes in `CPWR\12003`. An index of 0 means that folder level isn't used.
 - **Multi-Conditions tab**: a folder per value of the first Category/Property, with a set per value of the
   second Category/Property inside it.
-- **Category "More…"** loads every category in the model, or in the selection when **Use Selection** is checked.
+- **Category / Property lists** are built from every property on every item in the model, or in the
+  selection and everything under it when **Use Selection** is checked (for example, select a model file in the
+  Selection Tree). This includes native parameters such as Revit's **System Abbreviation**.
+  The lists refresh after the model, the selection or Use Selection changes.
+- **Searching for a property:** leave Category blank and start typing in Property, for example `System Abb`.
+  The list shows every match as `Property  [Category]`, and picking one fills in both boxes. A property name
+  typed without a category is accepted if only one category has it.
 - **Use Selection** limits the search scope of the sets to the current selection.
 - **Re-running** with the same settings only adds sets that don't exist yet.
   **Delete Existing** rebuilds the parent folder, which removes stale sets.
@@ -26,7 +32,7 @@ The pane is also listed under **View > Windows**.
 
 ## Download and install
 
-1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.0.1.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.0.1.zip).
+1. Download [`dist/SpoolToSearchSets-Navisworks2027-v2.1.0.zip`](dist/SpoolToSearchSets-Navisworks2027-v2.1.0.zip).
 2. Close Navisworks, extract the zip, and double-click `Install.cmd`.
 
 The installer copies the add-in to `%AppData%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle` for the

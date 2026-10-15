@@ -8,6 +8,11 @@ Install
   4. Start Navisworks 2027. Click "Spool To Search Sets" on the "Tool add-ins 1" ribbon tab
      to open the dockable pane. You can keep working in the model while it is open.
 
+Finding a parameter (e.g. System Abbreviation)
+  Leave Category blank and type part of the name in Property. Matches show as
+  "Property  [Category]"; pick one to fill in both. With Use Selection checked, the lists
+  only show properties of the selected items (select a model file to use that whole model).
+
   The add-in is copied to:
     %APPDATA%\Autodesk\ApplicationPlugins\SpoolToSearchSets.bundle
 

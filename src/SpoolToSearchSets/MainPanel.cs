@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 using Autodesk.Navisworks.Api;
 using NwApp = Autodesk.Navisworks.Api.Application;
@@ -11,10 +12,17 @@ namespace SpoolToSearchSets
     internal sealed class MainPanel : UserControl
     {
         public const string Caption = "Spool To Search Sets";
-        const string More = "More…";
+        // Property list entries shown when no Category is given: "System Abbreviation  [Element]".
+        const string PairOpen = "  [";
 
         readonly Settings _settings = Settings.Load();
-        bool _filling;
+        readonly ToolTip _tips = new ToolTip();
+
+        // Category -> property names in scope; rebuilt after the model, the selection
+        // (with Use Selection) or the Use Selection option changes.
+        Dictionary<string, HashSet<string>> _index;
+        Document _indexDoc;
+        bool _indexUsesSelection;
 
         readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill };
         readonly CheckBox _useSelection = new CheckBox { Text = "Use Selection", AutoSize = true };
@@ -35,7 +43,6 @@ namespace SpoolToSearchSets
 
         public MainPanel()
         {
-
             var single = NewTable();
             AddRow(single, "Category", _category);
             AddRow(single, "Property", _property);
@@ -61,18 +68,18 @@ namespace SpoolToSearchSets
             Controls.Add(_tabs);
             Controls.Add(bottom);
 
-            WireCategory(_category, _property);
-            WireCategory(_folderCategory, _folderProperty);
-            WireCategory(_setCategory, _setProperty);
+            Wire(_category, _property);
+            Wire(_folderCategory, _folderProperty);
+            Wire(_setCategory, _setProperty);
             LoadSettings();
         }
 
         void LoadSettings()
         {
             var s = _settings;
-            Init(_category, s.Category, true); Init(_property, s.Property, false);
-            Init(_folderCategory, s.MultiFolderCategory, true); Init(_folderProperty, s.MultiFolderProperty, false);
-            Init(_setCategory, s.MultiSetCategory, true); Init(_setProperty, s.MultiSetProperty, false);
+            _category.Text = s.Category; _property.Text = s.Property;
+            _folderCategory.Text = s.MultiFolderCategory; _folderProperty.Text = s.MultiFolderProperty;
+            _setCategory.Text = s.MultiSetCategory; _setProperty.Text = s.MultiSetProperty;
             _folderName.Text = s.FolderName;
             _delimiter.Text = s.Delimiter;
             _primaryIndex.Value = Clamp(s.PrimaryIndex, _primaryIndex);
@@ -91,6 +98,10 @@ namespace SpoolToSearchSets
                 MessageBox.Show(this, "Open a model first.", Caption);
                 return;
             }
+
+            ResolveCategory(_category, _property);
+            ResolveCategory(_folderCategory, _folderProperty);
+            ResolveCategory(_setCategory, _setProperty);
 
             bool multi = _tabs.SelectedIndex == 1;
             string[] required = multi
@@ -144,54 +155,101 @@ namespace SpoolToSearchSets
             s.Save();
         }
 
-        // Picking "More…" loads every category in the model (or selection);
-        // picking a category loads its properties.
-        void WireCategory(ComboBox category, ComboBox property)
+        // Lists load when a box is opened or focused, so typing autocompletes. With Category
+        // blank, Property lists every property in scope as "Property  [Category]"; picking one
+        // fills in both, so a parameter can be found without knowing its category.
+        void Wire(ComboBox category, ComboBox property)
         {
-            category.SelectedIndexChanged += (s, e) =>
-            {
-                if (_filling || category.SelectedItem == null || Doc == null || Doc.IsClear) return;
-                if ((string)category.SelectedItem == More)
-                {
-                    Fill(category, SetBuilder.CategoryNames(Doc, _useSelection.Checked), "", true);
-                    category.DroppedDown = true;
-                }
-                else
-                {
-                    Fill(property, SetBuilder.PropertyNames(Doc, _useSelection.Checked, (string)category.SelectedItem),
-                        property.Text, false);
-                }
-            };
+            category.DropDown += (s, e) => Fill(category, Index().Keys);
+            category.Enter += (s, e) => Fill(category, Index().Keys);
+            property.DropDown += (s, e) => Fill(property, PropertyChoices(category.Text.Trim()));
+            property.Enter += (s, e) => Fill(property, PropertyChoices(category.Text.Trim()));
+            property.SelectionChangeCommitted += (s, e) => BeginInvoke((Action)(() => ApplyPair(category, property)));
+            property.Leave += (s, e) => ApplyPair(category, property);
+            _tips.SetToolTip(property, "Leave Category blank to search every property, e.g. type \"System Abb\".");
         }
 
-        void Fill(ComboBox box, IEnumerable<string> items, string text, bool addMore)
+        IEnumerable<string> PropertyChoices(string category)
         {
-            _filling = true;
-            Cursor = Cursors.WaitCursor;
+            var index = Index();
+            if (index.TryGetValue(category, out HashSet<string> props)) return props;
+            return index.SelectMany(c => c.Value.Select(p => p + PairOpen + c.Key + "]"));
+        }
+
+        static void ApplyPair(ComboBox category, ComboBox property)
+        {
+            string text = property.Text;
+            int i = text.LastIndexOf(PairOpen, StringComparison.Ordinal);
+            if (i <= 0 || !text.EndsWith("]", StringComparison.Ordinal)) return;
+            category.Text = text.Substring(i + PairOpen.Length, text.Length - i - PairOpen.Length - 1);
+            property.Text = text.Substring(0, i);
+        }
+
+        // A property typed without a category is fine if only one category has it.
+        void ResolveCategory(ComboBox category, ComboBox property)
+        {
+            ApplyPair(category, property);
+            string name = property.Text.Trim();
+            if (category.Text.Trim().Length > 0 || name.Length == 0) return;
+            var owners = Index().Where(c => c.Value.Contains(name)).Select(c => c.Key).Take(2).ToList();
+            if (owners.Count == 1) category.Text = owners[0];
+        }
+
+        Dictionary<string, HashSet<string>> Index()
+        {
+            Document doc = Doc;
+            if (doc == null || doc.IsClear) return new Dictionary<string, HashSet<string>>();
+            if (_index == null || doc != _indexDoc || _useSelection.Checked != _indexUsesSelection)
+            {
+                Watch(doc);
+                Cursor = Cursors.WaitCursor;
+                try { _index = SetBuilder.PropertyIndex(doc, _useSelection.Checked); }
+                finally { Cursor = Cursors.Default; }
+                _indexUsesSelection = _useSelection.Checked;
+            }
+            return _index;
+        }
+
+        void Watch(Document doc)
+        {
+            if (doc == _indexDoc) return;
+            Unwatch();
+            _indexDoc = doc;
+            doc.CurrentSelection.Changed += OnSelectionChanged;
+            doc.Models.CollectionChanged += OnModelsChanged;
+        }
+
+        void Unwatch()
+        {
+            if (_indexDoc == null) return;
+            _indexDoc.CurrentSelection.Changed -= OnSelectionChanged;
+            _indexDoc.Models.CollectionChanged -= OnModelsChanged;
+            _indexDoc = null;
+        }
+
+        void OnSelectionChanged(object sender, EventArgs e) { if (_indexUsesSelection) _index = null; }
+        void OnModelsChanged(object sender, EventArgs e) => _index = null;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) { Unwatch(); _tips.Dispose(); }
+            base.Dispose(disposing);
+        }
+
+        static void Fill(ComboBox box, IEnumerable<string> items)
+        {
+            string text = box.Text;
+            box.BeginUpdate();
             try
             {
-                box.BeginUpdate();
                 box.Items.Clear();
-                foreach (string item in items) box.Items.Add(item);
-                if (addMore) box.Items.Add(More);
+                box.Items.AddRange(items.OrderBy(i => i, StringComparer.OrdinalIgnoreCase).Cast<object>().ToArray());
                 box.Text = text;
             }
-            finally
-            {
-                box.EndUpdate();
-                Cursor = Cursors.Default;
-                _filling = false;
-            }
+            finally { box.EndUpdate(); }
         }
 
-        void Init(ComboBox box, string saved, bool addMore) =>
-            Fill(box, string.IsNullOrEmpty(saved) ? new string[0] : new[] { saved }, saved, addMore);
-
-        static string Value(ComboBox box)
-        {
-            string text = box.Text.Trim();
-            return text == More ? "" : text;
-        }
+        static string Value(ComboBox box) => box.Text.Trim();
 
         static decimal Clamp(int value, NumericUpDown box) => Math.Max(box.Minimum, Math.Min(box.Maximum, value));
 
@@ -218,7 +276,13 @@ namespace SpoolToSearchSets
             t.RowCount++;
         }
 
-        static ComboBox NewCombo() => new ComboBox { DropDownStyle = ComboBoxStyle.DropDown, Sorted = false };
+        static ComboBox NewCombo() => new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDown,
+            MaxDropDownItems = 25,
+            AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+            AutoCompleteSource = AutoCompleteSource.ListItems,
+        };
         static TextBox NewText() => new TextBox();
         // 0 = not used; otherwise the 1-based part of the delimited value.
         static NumericUpDown NewIndex() => new NumericUpDown { Minimum = 0, Maximum = 50 };
